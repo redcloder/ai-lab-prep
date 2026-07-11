@@ -69,7 +69,7 @@ def main():
     plt.title("Loss Curve")
     plt.show()
 
-    # 6.2 前 50 轮 loss 曲线
+    # 6.2 前 10 轮 loss 曲线
     plt.figure()
     plt.plot(losses[:10])
     plt.xlabel("epoch")
