@@ -874,4 +874,329 @@ L2 在原始梯度上增加：
 * 理解 `loss.backward()` 执行了什么
 * 使用 PyTorch 重写线性回归
 
+## Day 6：Tensor 与 autograd
+
+日期：2026-07-14
+
+### 今日任务
+
+* [ ] 完成一道栈 / 队列简单题
+* [x] 配置并检查 PyTorch 环境
+* [x] 验证 PyTorch 能够调用 NVIDIA GPU
+* [x] 学习 Tensor 的创建、shape、dtype 和 device
+* [x] 学习 Tensor 的索引、reshape 和广播机制
+* [x] 理解 Tensor 与 NumPy array 的区别
+* [x] 学习 autograd 自动求导
+* [x] 理解 `requires_grad` 和计算图
+* [x] 理解 `loss.backward()` 的作用
+* [x] 学习梯度累积、梯度清零和参数更新
+* [x] 使用 PyTorch 重写线性回归
+
+### 今日学习记录
+
+#### 1. PyTorch 环境配置
+
+今天在 `ai-lab-prep` Conda 环境中安装并配置了 PyTorch。
+
+当前环境：
+
+* Python 版本：3.11.15
+* PyTorch 版本：2.13.0+cu126
+* PyTorch CUDA 版本：12.6
+* GPU：NVIDIA GeForce RTX 4060 Laptop GPU
+
+通过以下代码检查 CUDA 是否可用：
+
+```python
+import torch
+
+print(torch.cuda.is_available())
+print(torch.cuda.get_device_name(0))
+```
+
+运行结果表明 PyTorch 能够正常识别并使用 GPU。
+
+#### 2. Tensor 基础
+
+学习了 Tensor 的创建方式，例如：
+
+```python
+import torch
+
+x = torch.tensor([1.0, 2.0, 3.0])
+zeros = torch.zeros(2, 3)
+ones = torch.ones(2, 3)
+random_tensor = torch.randn(2, 3)
+```
+
+Tensor 的常见属性包括：
+
+```python
+print(x.shape)
+print(x.ndim)
+print(x.dtype)
+print(x.device)
+print(x.numel())
+```
+
+其中：
+
+* `shape` 表示每个维度的大小
+* `ndim` 表示 Tensor 的维数
+* `dtype` 表示元素的数据类型
+* `device` 表示 Tensor 位于 CPU 还是 GPU
+* `numel()` 表示 Tensor 中元素的总数量
+
+#### 3. reshape、索引与广播
+
+使用 `reshape` 可以在元素总数不变的情况下改变 Tensor 的形状：
+
+```python
+x = torch.arange(12).reshape(3, 4)
+```
+
+使用索引和切片可以取出指定位置的数据：
+
+```python
+x[:, 1]
+```
+
+表示取出所有行的第二列。
+
+广播允许不同 shape 的 Tensor 进行运算，例如：
+
+```python
+a = torch.ones(2, 3)
+b = torch.tensor([10.0, 20.0, 30.0])
+
+result = a + b
+```
+
+`b` 的 shape 为 `[3]`，可以广播为 `[2, 3]`，最终结果的 shape 为 `[2, 3]`。
+
+#### 4. Tensor 与 NumPy array 的区别
+
+Tensor 和 NumPy array 都支持：
+
+* 多维数组
+* shape
+* 索引与切片
+* 广播
+* 矩阵运算
+
+主要区别是：
+
+* Tensor 可以在 GPU 上进行计算
+* Tensor 支持 autograd 自动求导
+* Tensor 是 PyTorch 模型参数、输入数据、预测结果和损失值的基础数据结构
+* Tensor 具有 `device` 属性，可以在 CPU 和 GPU 之间移动
+
+Tensor 移动到 GPU：
+
+```python
+x = x.to("cuda")
+```
+
+GPU Tensor 转为 NumPy array 时，需要先移动回 CPU：
+
+```python
+array = x.cpu().numpy()
+```
+
+如果 Tensor 属于计算图，则需要先使用 `detach()`：
+
+```python
+array = x.detach().cpu().numpy()
+```
+
+#### 5. autograd 自动求导
+
+通过设置：
+
+```python
+x = torch.tensor(2.0, requires_grad=True)
+```
+
+可以让 PyTorch 追踪 `x` 参与的运算。
+
+例如：
+
+```python
+x = torch.tensor(2.0, requires_grad=True)
+y = x ** 2
+
+y.backward()
+
+print(x.grad)
+```
+
+因为：
+
+$$
+y=x^2
+$$
+
+所以：
+
+$$
+\frac{dy}{dx}=2x
+$$
+
+当 `x = 2` 时，最终梯度为 4。
+
+`requires_grad=True` 表示 PyTorch 需要记录该 Tensor 参与的计算，以便后续计算最终结果对该 Tensor 的梯度。
+
+#### 6. `loss.backward()` 的作用
+
+`loss.backward()` 会从 loss 开始沿计算图反向传播，并通过链式法则计算 loss 对所有需要求导参数的梯度。
+
+计算得到的梯度会存放在参数的 `.grad` 属性中：
+
+```python
+loss.backward()
+
+print(weight.grad)
+print(bias.grad)
+```
+
+`loss.backward()` 只负责计算梯度，不会自动更新模型参数。
+
+参数需要根据梯度手动更新：
+
+```python
+with torch.no_grad():
+    weight -= learning_rate * weight.grad
+    bias -= learning_rate * bias.grad
+```
+
+#### 7. 梯度累积与清零
+
+PyTorch 默认会累积梯度。
+
+如果连续调用两次 `backward()`，第二次计算的梯度会加到第一次的梯度上。
+
+因此每轮训练结束后需要清空梯度：
+
+```python
+weight.grad.zero_()
+bias.grad.zero_()
+```
+
+使用优化器时，一般写成：
+
+```python
+optimizer.zero_grad()
+```
+
+#### 8. 使用 PyTorch 实现线性回归
+
+今天使用 PyTorch 和 autograd 实现了线性回归，训练数据满足：
+
+$$
+y=3x+2+\text{noise}
+$$
+
+模型公式为：
+
+$$
+\hat{y}=xw+b
+$$
+
+代码中的前向计算：
+
+```python
+prediction = x @ weight + bias
+```
+
+损失函数使用均方误差：
+
+```python
+loss = ((prediction - y) ** 2).mean()
+```
+
+完整训练流程为：
+
+```python
+for epoch in range(epochs):
+    prediction = x @ weight + bias
+    loss = ((prediction - y) ** 2).mean()
+
+    loss.backward()
+
+    with torch.no_grad():
+        weight -= learning_rate * weight.grad
+        bias -= learning_rate * bias.grad
+
+    weight.grad.zero_()
+    bias.grad.zero_()
+```
+
+最终模型能够学习到接近真实值的参数：
+
+```text
+weight ≈ 3
+bias ≈ 2
+```
+
+
+#### 9. 输入数据的 shape
+
+在线性回归预测时使用：
+
+```python
+input_tensor = torch.tensor([[x]])
+```
+
+使用两层中括号是为了让输入保持二维结构。
+
+当只有一个样本和一个特征时：
+
+```text
+shape = [1, 1]
+```
+
+其中：
+
+* 第一维表示样本数量
+* 第二维表示每个样本的特征数量
+
+训练数据通常使用：
+
+```text
+[batch_size, feature_count]
+```
+
+的格式。
+
+### 遇到的问题
+
+* 需要注意 CPU Tensor 和 GPU Tensor 不能直接进行运算
+* GPU Tensor 不能直接转换为 NumPy array，需要先调用 `.cpu()`
+* 参与自动求导的 Tensor 转换为 NumPy 前，需要先调用 `.detach()`
+* PyTorch 默认累积梯度，每轮参数更新后必须清空梯度
+* 理解了预测单个数据时使用 `[[x]]` 是为了保持 `[样本数, 特征数]` 的二维格式
+
+### 今日总结
+
+今天完成了 PyTorch 入门的第一部分，掌握了 Tensor 的基本操作、shape、broadcast、device 和 autograd。
+
+目前能够解释：
+
+* Tensor 和 NumPy array 的区别
+* `requires_grad=True` 的含义
+* `loss.backward()` 做了什么
+* 为什么训练时需要清空梯度
+* PyTorch 线性回归的基本训练流程
+
+### 明日计划
+
+*  完成一道二分查找简单题
+*  学习 `Dataset` 的作用和基本使用方法
+*  学习 `DataLoader` 的作用和基本使用方法
+*  理解 batch、batch size 和数据打乱
+*  使用 `torchvision` 加载 MNIST 或 Fashion-MNIST
+*  理解图像数据 `[batch_size, channels, height, width]` 的维度含义
+*  使用 Matplotlib 可视化 16 张图片
+
+
 
